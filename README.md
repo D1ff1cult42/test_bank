@@ -1,105 +1,117 @@
-<h1>🚀 Разработка Системы Управления Банковскими Картами</h1>
+# Система управления банковскими картами
 
-<h2>📁 Стартовая структура</h2>
-  <p>
-    Проектная структура с директориями и описательными файлами (<code>README Controller.md</code>, <code>README Service.md</code> и т.д.) уже подготовлена.<br />
-    Все реализации нужно добавлять <strong>в соответствующие директории</strong>.
-  </p>
-  <p>
-    После завершения разработки <strong>временные README-файлы нужно удалить</strong>, чтобы они не попадали в итоговую сборку.
-  </p>
-  
-<h2>📝 Описание задачи</h2>
-  <p>Разработать backend-приложение на Java (Spring Boot) для управления банковскими картами:</p>
-  <ul>
-    <li>Создание и управление картами</li>
-    <li>Просмотр карт</li>
-    <li>Переводы между своими картами</li>
-  </ul>
+Backend-приложение на Spring Boot для управления банковскими картами: аутентификация по JWT
+(в HttpOnly cookie), управление пользователями (ADMIN), выпуск/блокировка/удаление карт,
+просмотр своих карт с поиском и пагинацией, переводы между своими картами.
 
-<h2>💳 Атрибуты карты</h2>
-  <ul>
-    <li>Номер карты (зашифрован, отображается маской: <code>**** **** **** 1234</code>)</li>
-    <li>Владелец</li>
-    <li>Срок действия</li>
-    <li>Статус: Активна, Заблокирована, Истек срок</li>
-    <li>Баланс</li>
-  </ul>
+## Технологии
 
-<h2>🧾 Требования</h2>
+Java 17, Spring Boot 3.3, Spring Security, Spring Data JPA, PostgreSQL, Liquibase, Docker,
+JWT (Nimbus JOSE, RS256), Swagger/OpenAPI (springdoc).
 
-<h3>✅ Аутентификация и авторизация</h3>
-  <ul>
-    <li>Spring Security + JWT</li>
-    <li>Роли: <code>ADMIN</code> и <code>USER</code></li>
-  </ul>
+## Архитектура
 
-<h3>✅ Возможности</h3>
-<strong>Администратор:</strong>
-  <ul>
-    <li>Создаёт, блокирует, активирует, удаляет карты</li>
-    <li>Управляет пользователями</li>
-    <li>Видит все карты</li>
-  </ul>
+```
+controller   — REST-эндпоинты (Auth, Card, User)
+service      — бизнес-логика (auth / card / user, разделение interface + impl)
+repository   — Spring Data JPA
+entity       — User, Card
+security     — JWT (RS256), фильтр, cookie, шифрование номера карты (AES-256/GCM)
+scheduler    — перевод просроченных карт в статус EXPIRED
+exception    — доменные исключения + глобальный обработчик
+dto          — request / response (records)
+```
 
-<strong>Пользователь:</strong>
-  <ul>
-    <li>Просматривает свои карты (поиск + пагинация)</li>
-    <li>Запрашивает блокировку карты</li>
-    <li>Делает переводы между своими картами</li>
-    <li>Смотрит баланс</li>
-  </ul>
+### Безопасность
+- **Аутентификация**: JWT RS256, access + refresh токены в HttpOnly/Secure/SameSite cookie.
+- **Ротация refresh-токена** с обнаружением повторного использования (через `tokenVersion`).
+- **Роли**: `USER`, `ADMIN` (`@EnableMethodSecurity` + проверки маршрутов).
+- **Шифрование номера карты**: AES-256/GCM (`CardNumberConverter`); в БД — шифротекст,
+  для поиска/уникальности — SHA-256 хэш, для отображения — маска `**** **** **** 1234`.
+- **CSRF** (double-submit cookie) и **CORS** настраиваются через конфиг.
 
-<h3>✅ API</h3>
-  <ul>
-    <li>CRUD для карт</li>
-    <li>Переводы между своими картами</li>
-    <li>Фильтрация и постраничная выдача</li>
-    <li>Валидация и сообщения об ошибках</li>
-  </ul>
+## Запуск через Docker Compose
 
-<h3>✅ Безопасность</h3>
-  <ul>
-    <li>Шифрование данных</li>
-    <li>Ролевой доступ</li>
-    <li>Маскирование номеров карт</li>
-  </ul>
+```bash
+docker compose up --build
+```
 
-<h3>✅ Работа с БД</h3>
-  <ul>
-    <li>PostgreSQL или MySQL</li>
-    <li>Миграции через Liquibase (<code>src/main/resources/db/migration</code>)</li>
-  </ul>
+Поднимется PostgreSQL и приложение (`http://localhost:8080`). Liquibase применит миграции
+автоматически при старте.
 
-<h3>✅ Документация</h3>
-  <ul>
-    <li>Swagger UI / OpenAPI — <code>docs/openapi.yaml</code></li>
-    <li><code>README.md</code> с инструкцией запуска</li>
-  </ul>
+## Локальный запуск
 
-<h3>✅ Развёртывание и тестирование</h3>
-  <ul>
-    <li>Docker Compose для dev-среды</li>
-    <li>Liquibase миграции</li>
-    <li>Юнит-тесты ключевой бизнес-логики</li>
-  </ul>
+1. Поднять PostgreSQL (например, только БД из compose):
+   ```bash
+   docker compose up -d db
+   ```
+2. Запустить приложение:
+   ```bash
+   ./mvnw spring-boot:run
+   ```
 
-<h2>📊 Оценка</h2>
-  <ul>
-    <li>Соответствие требованиям</li>
-    <li>Чистота архитектуры и кода</li>
-    <li>Безопасность</li>
-    <li>Обработка ошибок</li>
-    <li>Покрытие тестами</li>
-    <li>ООП и уровни абстракции</li>
-  </ul>
+## Конфигурация (переменные окружения)
 
-<h2>💡 Технологии</h2>
-  <p>
-    Java 17+, Spring Boot, Spring Security, Spring Data JPA, PostgreSQL/MySQL, Liquibase, Docker, JWT, Swagger (OpenAPI)
-  </p>
+| Переменная | Назначение | По умолчанию |
+|---|---|---|
+| `SPRING_DATASOURCE_URL` | JDBC URL PostgreSQL | `jdbc:postgresql://localhost:5432/bankcards` |
+| `SPRING_DATASOURCE_USERNAME` / `_PASSWORD` | креды БД | `bankcards` / `bankcards` |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | RSA-ключи (PEM) для JWT | генерируются эфемерно (dev) |
+| `CARD_ENCRYPTION_KEY` | AES-256 ключ (Base64, 32 байта) для шифрования номеров | небезопасный dev-ключ |
+| `AUTH_COOKIE_SECURE` | флаг Secure для cookie | `false` (dev) |
+| `AUTH_CORS_ALLOWED_ORIGINS` | разрешённые origin (через запятую) | `http://localhost:3000,http://localhost:8080` |
+| `AUTH_CSRF_ENABLED` | включение CSRF-защиты | `true` |
+| `card.expiry.cron` | расписание шедулера просрочки | `0 5 0 * * *` (ежедневно 00:05) |
 
-<h2> 📤 Формат сдачи</h2>
-<p>
-Весь код и изменения принимаются только через git-репозиторий с открытым доступом к проекту. Отправка файлов в любом виде не принимается.
-  </p>
+> Для production обязательно задать `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY`, `CARD_ENCRYPTION_KEY`
+> и `AUTH_COOKIE_SECURE=true`.
+
+## Документация API
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI (статическая спецификация): [`docs/openapi.yaml`](docs/openapi.yaml)
+
+## Основные эндпоинты
+
+### Auth (`/api/auth`)
+| Метод | Путь | Описание |
+|---|---|---|
+| POST | `/register` | регистрация (роль USER) |
+| POST | `/login` | вход |
+| POST | `/refresh` | обновление токенов (ротация) |
+| POST | `/logout` | выход |
+| POST | `/logout-all` | отзыв всех сессий |
+
+### Карты (`/api/cards`)
+| Метод | Путь | Доступ | Описание |
+|---|---|---|---|
+| POST | `/` | ADMIN | выпуск карты |
+| GET | `/` | ADMIN | все карты (поиск + пагинация) |
+| GET | `/my` | USER | свои карты (поиск + пагинация) |
+| GET | `/{id}` | владелец | карта |
+| GET | `/{id}/balance` | владелец | баланс |
+| POST | `/{id}/block-request` | владелец | запрос блокировки |
+| POST | `/transfer` | USER | перевод между своими картами |
+| POST | `/{id}/block` | ADMIN | блокировка |
+| POST | `/{id}/activate` | ADMIN | активация |
+| DELETE | `/{id}` | ADMIN | удаление (soft) |
+
+### Пользователи (`/api/users`, только ADMIN)
+| Метод | Путь | Описание |
+|---|---|---|
+| POST | `/` | создать пользователя с ролью |
+| GET | `/` | список (поиск + пагинация) |
+| GET | `/{id}` | пользователь |
+| PATCH | `/{id}/role` | смена роли |
+| POST | `/{id}/block` | блокировка |
+| POST | `/{id}/activate` | активация |
+| DELETE | `/{id}` | удаление (каскадно с картами) |
+
+## Тесты
+
+```bash
+./mvnw test
+```
+
+Покрыта ключевая бизнес-логика карт: переводы (успех, недостаток средств, та же карта),
+изоляция владельца (доступ к чужой карте → 404), проверка статусов (заблокирована/просрочена).
