@@ -1,0 +1,807 @@
+openapi: 3.0.1
+info:
+  title: API системы управления банковскими картами
+  description: |-
+    REST API для управления банковскими картами: выпуск, блокировка, просмотр и переводы между своими картами.
+
+    Аутентификация — JWT (RS256). Access- и refresh-токены передаются в HttpOnly cookie, поэтому в Swagger UI отдельная авторизация не требуется: выполните POST /api/auth/login, после чего cookie проставятся автоматически и защищённые запросы будут проходить.
+
+    Роли: USER — работа со своими картами; ADMIN — управление картами и пользователями.
+  contact:
+    name: D1ff1cult42
+    email: orbitovkek@gmail.com
+  version: "1.0"
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+tags:
+- name: Аутентификация
+  description: "Регистрация, вход, обновление токенов и выход"
+- name: Карты
+  description: "Управление картами, просмотр и переводы между своими картами"
+- name: Пользователи
+  description: Администрирование пользователей (только ADMIN)
+paths:
+  /api/users:
+    get:
+      tags:
+      - Пользователи
+      summary: Список пользователей с поиском и пагинацией
+      operationId: getUsers
+      parameters:
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          minimum: 0
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+          default: 20
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponse"
+    post:
+      tags:
+      - Пользователи
+      summary: Создать пользователя с заданной ролью
+      operationId: createUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCreateUserRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+  /api/users/{id}/block:
+    post:
+      tags:
+      - Пользователи
+      summary: Заблокировать пользователя
+      operationId: blockUser
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/users/{id}/activate:
+    post:
+      tags:
+      - Пользователи
+      summary: Активировать пользователя
+      operationId: activateUser
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/cards:
+    get:
+      tags:
+      - Карты
+      summary: Список всех карт с поиском и пагинацией (только ADMIN)
+      operationId: getAllCards
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - BLOCKED
+          - EXPIRED
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          minimum: 0
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+          default: 20
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponse"
+    post:
+      tags:
+      - Карты
+      summary: Выпустить новую карту (только ADMIN)
+      operationId: createCard
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCardRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CardResponse"
+  /api/cards/{id}/block:
+    post:
+      tags:
+      - Карты
+      summary: Заблокировать карту (только ADMIN)
+      operationId: blockCard
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/cards/{id}/block-request:
+    post:
+      tags:
+      - Карты
+      summary: Запросить блокировку одной из своих карт
+      operationId: requestBlock
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/cards/{id}/activate:
+    post:
+      tags:
+      - Карты
+      summary: Активировать карту (только ADMIN)
+      operationId: activateCard
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/cards/transfer:
+    post:
+      tags:
+      - Карты
+      summary: Перевести деньги между двумя своими картами
+      operationId: transfer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/auth/register:
+    post:
+      tags:
+      - Аутентификация
+      summary: Регистрация нового пользователя
+      description: Регистрирует пользователя с ролью USER. Access/refresh токены возвращаются
+        в HttpOnly cookie.
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+        required: true
+      responses:
+        "201":
+          description: Пользователь успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Пользователь уже существует
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: Некорректные входные данные
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/refresh:
+    post:
+      tags:
+      - Аутентификация
+      summary: Обновление токенов
+      description: Выдаёт новую пару токенов по refresh-токену из HttpOnly cookie
+        (с ротацией).
+      operationId: refresh
+      responses:
+        "200":
+          description: Токены успешно обновлены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Невалидный или истёкший refresh-токен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/logout:
+    post:
+      tags:
+      - Аутентификация
+      summary: Выход
+      description: Очищает cookie с токенами на стороне клиента.
+      operationId: logout
+      responses:
+        "204":
+          description: Выход выполнен
+  /api/auth/logout-all:
+    post:
+      tags:
+      - Аутентификация
+      summary: Выход со всех устройств
+      description: Отзывает все refresh-токены пользователя за счёт инкремента версии
+        токена.
+      operationId: logoutAll
+      responses:
+        "204":
+          description: Все сессии отозваны
+        "401":
+          description: Не аутентифицирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/login:
+    post:
+      tags:
+      - Аутентификация
+      summary: Вход пользователя
+      description: Аутентифицирует пользователя. Access/refresh токены возвращаются
+        в HttpOnly cookie.
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "200":
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: Некорректные входные данные
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/users/{id}/role:
+    patch:
+      tags:
+      - Пользователи
+      summary: Изменить роль пользователя
+      operationId: updateRole
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+  /api/users/{id}:
+    get:
+      tags:
+      - Пользователи
+      summary: Получить пользователя по id
+      operationId: getUser
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+    delete:
+      tags:
+      - Пользователи
+      summary: Удалить пользователя
+      operationId: deleteUser
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/cards/{id}:
+    get:
+      tags:
+      - Карты
+      summary: Получить одну из карт текущего пользователя
+      operationId: getCard
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CardResponse"
+    delete:
+      tags:
+      - Карты
+      summary: Удалить карту (только ADMIN)
+      operationId: deleteCard
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/cards/{id}/balance:
+    get:
+      tags:
+      - Карты
+      summary: Получить баланс одной из карт текущего пользователя
+      operationId: getBalance
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: number
+  /api/cards/my:
+    get:
+      tags:
+      - Карты
+      summary: Список карт текущего пользователя с поиском и пагинацией
+      operationId: getMyCards
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - BLOCKED
+          - EXPIRED
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          minimum: 0
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+          default: 20
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponse"
+components:
+  schemas:
+    AdminCreateUserRequest:
+      required:
+      - email
+      - password
+      - role
+      - username
+      type: object
+      properties:
+        email:
+          type: string
+          description: Email пользователя (уникальный)
+          example: user@gmail.com
+        username:
+          maxLength: 50
+          minLength: 2
+          type: string
+          description: "Имя пользователя, от 2 до 50 символов"
+          example: 42bratuha
+        password:
+          maxLength: 2147483647
+          minLength: 8
+          type: string
+          description: "Пароль, не менее 8 символов"
+          example: strongpassword123
+        role:
+          type: string
+          description: Роль пользователя
+          example: USER
+          enum:
+          - USER
+          - ADMIN
+      description: Запрос администратора на создание пользователя с заданной ролью
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Идентификатор пользователя
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        email:
+          type: string
+          description: Email пользователя
+          example: user@gmail.com
+        username:
+          type: string
+          description: Имя пользователя
+          example: 42bratuha
+        role:
+          type: string
+          description: Роль пользователя
+          example: USER
+          enum:
+          - USER
+          - ADMIN
+        active:
+          type: boolean
+          description: Активен ли пользователь (false — заблокирован)
+          example: true
+        createdAt:
+          type: string
+          description: Дата и время создания учётной записи
+          format: date-time
+          example: 2026-06-28T12:00:00Z
+        lastLogin:
+          type: string
+          description: Дата и время последнего входа
+          format: date-time
+          example: 2026-06-28T12:30:00Z
+      description: Представление пользователя для административных операций
+    CreateCardRequest:
+      required:
+      - ownerId
+      type: object
+      properties:
+        ownerId:
+          type: string
+          description: Id пользователя — будущего владельца карты
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        initialBalance:
+          type: number
+          description: "Начальный баланс карты (необязательно, по умолчанию 0)"
+          example: 0.0
+      description: Запрос на выпуск новой карты для пользователя
+    CardResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Идентификатор карты
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        maskedNumber:
+          type: string
+          description: Маскированный номер карты
+          example: '**** **** **** 1234'
+        ownerUsername:
+          type: string
+          description: Имя владельца карты
+          example: 42bratuha
+        expiryDate:
+          type: string
+          description: Дата окончания срока действия
+          format: date
+          example: 2029-06-30
+        status:
+          type: string
+          description: "Статус карты: ACTIVE — активна, BLOCKED — заблокирована, EXPIRED\
+            \ — истёк срок"
+          example: ACTIVE
+          enum:
+          - ACTIVE
+          - BLOCKED
+          - EXPIRED
+        balance:
+          type: number
+          description: Текущий баланс карты
+          example: 100.0
+      description: Представление карты с маскированным номером (полный номер наружу
+        не отдаётся)
+    TransferRequest:
+      required:
+      - amount
+      - fromCardId
+      - toCardId
+      type: object
+      properties:
+        fromCardId:
+          type: string
+          description: Id карты списания (откуда переводим)
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        toCardId:
+          type: string
+          description: Id карты зачисления (куда переводим)
+          format: uuid
+          example: 9c858901-8a57-4791-81fe-4c455b099bc9
+        amount:
+          minimum: 0.01
+          exclusiveMinimum: false
+          type: number
+          description: "Сумма перевода, должна быть положительной"
+          example: 100.0
+      description: Перевод средств между двумя картами одного владельца
+    AuthResponse:
+      type: object
+      properties:
+        tokenType:
+          type: string
+          description: Тип токена
+          example: Bearer
+        expiresAt:
+          type: string
+          description: Время истечения access-токена
+          format: date-time
+          example: 2026-06-26T12:15:00Z
+      description: Результат аутентификации. Сами токены передаются в HttpOnly cookie.
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Человекочитаемое сообщение об ошибке
+          example: Invalid credentials
+        error:
+          type: string
+          description: Тип или категория ошибки
+          example: Unauthorized
+        status:
+          type: integer
+          description: HTTP-статус ответа
+          format: int32
+          example: 401
+        timestamp:
+          type: string
+          description: Момент возникновения ошибки
+          format: date-time
+          example: 2026-06-28T12:00:00Z
+        path:
+          type: string
+          description: "Путь запроса, вызвавшего ошибку"
+          example: /api/auth/login
+      description: Стандартное тело ответа об ошибке
+    RegisterRequest:
+      required:
+      - email
+      - password
+      - username
+      type: object
+      properties:
+        email:
+          type: string
+          description: Email пользователя (уникальный)
+          example: user@gmail.com
+        password:
+          maxLength: 2147483647
+          minLength: 8
+          type: string
+          description: "Пароль, не менее 8 символов"
+          example: strongpassword123
+        username:
+          maxLength: 50
+          minLength: 2
+          type: string
+          description: "Желаемое имя пользователя, от 2 до 50 символов"
+          example: 42bratuha
+      description: Запрос на регистрацию нового пользователя (роль USER назначается
+        автоматически)
+    LoginRequest:
+      required:
+      - email
+      - password
+      type: object
+      properties:
+        email:
+          type: string
+          description: Email пользователя
+          example: user@gmail.com
+        password:
+          type: string
+          description: Пароль пользователя
+          example: strongpassword123
+      description: Запрос на вход пользователя в систему
+    UpdateRoleRequest:
+      required:
+      - role
+      type: object
+      properties:
+        role:
+          type: string
+          description: Новая роль пользователя
+          example: ADMIN
+          enum:
+          - USER
+          - ADMIN
+      description: Запрос на изменение роли пользователя
+    PageResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          description: Элементы текущей страницы
+          items:
+            $ref: "#/components/schemas/UserResponse"
+        page:
+          type: integer
+          description: Номер текущей страницы (с нуля)
+          format: int32
+          example: 0
+        size:
+          type: integer
+          description: Размер страницы
+          format: int32
+          example: 20
+        totalElements:
+          type: integer
+          description: Общее количество элементов
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          description: Общее количество страниц
+          format: int32
+          example: 3
+        last:
+          type: boolean
+          description: Является ли текущая страница последней
+          example: false
+      description: Постраничный результат выборки
