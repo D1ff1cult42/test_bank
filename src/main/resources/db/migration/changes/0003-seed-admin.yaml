@@ -1,0 +1,38 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0003-seed-admin
+      author: bankcards
+      comment: >-
+        Стартовый администратор для первичного входа. Пароль (BCrypt) — Admin123!.
+        Смените его сразу после первого запуска. preConditions гарантирует, что
+        сид не выполнится, если ADMIN уже существует.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 0
+            sql: SELECT count(*) FROM auth_users WHERE role = 'ADMIN'
+      changes:
+        - insert:
+            tableName: auth_users
+            columns:
+              - column:
+                  name: id
+                  valueComputed: gen_random_uuid()
+              - column:
+                  name: email
+                  value: admin@bankcards.local
+              - column:
+                  name: username
+                  value: admin
+              - column:
+                  name: password_hash
+                  value: $2a$10$yowcym0AjEA53VPzEJOKJ.IZDSqe1QKX0B/tn2sfXRlKh8AZSp8o.
+              - column:
+                  name: is_active
+                  valueBoolean: true
+              - column:
+                  name: token_version
+                  valueNumeric: 0
+              - column:
+                  name: role
+                  value: ADMIN
