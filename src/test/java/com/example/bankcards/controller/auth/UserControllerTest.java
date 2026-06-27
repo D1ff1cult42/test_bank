@@ -7,6 +7,8 @@ import com.example.bankcards.dto.response.UserResponse;
 import com.example.bankcards.entity.User;
 import com.example.bankcards.exception.UserAlreadyExistsException;
 import com.example.bankcards.exception.UserNotFoundException;
+import com.example.bankcards.security.CookieUtils;
+import com.example.bankcards.security.JwtService;
 import com.example.bankcards.service.user.interfaces.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,10 @@ class UserControllerTest {
     private ObjectMapper objectMapper;
     @MockBean
     private UserService userService;
+    @MockBean
+    private JwtService jwtService;
+    @MockBean
+    private CookieUtils cookieUtils;
 
     private UserResponse sampleUser(UUID id) {
         return UserResponse.builder()

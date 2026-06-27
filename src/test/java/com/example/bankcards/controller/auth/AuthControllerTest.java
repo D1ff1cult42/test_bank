@@ -6,6 +6,7 @@ import com.example.bankcards.dto.request.RegisterRequest;
 import com.example.bankcards.exception.InvalidCredentialsException;
 import com.example.bankcards.exception.UserAlreadyExistsException;
 import com.example.bankcards.security.CookieUtils;
+import com.example.bankcards.security.JwtService;
 import com.example.bankcards.security.record.AuthTokens;
 import com.example.bankcards.service.auth.interfaces.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,6 +44,8 @@ class AuthControllerTest {
     private AuthService authService;
     @MockBean
     private CookieUtils cookieUtils;
+    @MockBean
+    private JwtService jwtService;
 
     private AuthTokens tokens() {
         return new AuthTokens("access-jwt", "refresh-jwt", Duration.ofMinutes(15), Duration.ofDays(7));

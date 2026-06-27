@@ -7,6 +7,8 @@ import com.example.bankcards.dto.response.CardResponse;
 import com.example.bankcards.entity.Card;
 import com.example.bankcards.exception.CardNotFoundException;
 import com.example.bankcards.exception.CardOperationException;
+import com.example.bankcards.security.CookieUtils;
+import com.example.bankcards.security.JwtService;
 import com.example.bankcards.service.card.interfaces.CardService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -50,6 +52,10 @@ class CardControllerTest {
     private ObjectMapper objectMapper;
     @MockBean
     private CardService cardService;
+    @MockBean
+    private JwtService jwtService;
+    @MockBean
+    private CookieUtils cookieUtils;
 
     private CardResponse sampleCard(UUID id) {
         return CardResponse.builder()
