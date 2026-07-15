@@ -7,7 +7,8 @@ Backend-приложение на Spring Boot для управления бан
 ## Технологии
 
 Java 17, Spring Boot 3.3, Spring Security, Spring Data JPA, PostgreSQL, Liquibase, Docker,
-JWT (Nimbus JOSE, RS256), Swagger/OpenAPI (springdoc).
+JWT (Nimbus JOSE, RS256), Swagger/OpenAPI (springdoc), observability — Grafana LGTM+P
+(Loki, Tempo, Prometheus, Alloy, Pyroscope).
 
 ## Архитектура
 
@@ -36,8 +37,62 @@ dto          — request / response (records)
 docker compose up --build
 ```
 
-Поднимется PostgreSQL и приложение (`http://localhost:8080`). Liquibase применит миграции
-автоматически при старте.
+Поднимется PostgreSQL, две реплики приложения за **nginx**-балансировщиком
+(`http://localhost:8080`), а также полный стек наблюдаемости. Liquibase применит
+миграции автоматически при старте.
+
+## Балансировка нагрузки (nginx)
+
+Перед приложением стоит **nginx** (единственный сервис, публикующий `8080` наружу),
+балансирует между двумя репликами `app1`/`app2` (`least_conn`, `max_fails=3
+fail_timeout=10s`). JWT-аутентификация полностью stateless (токены в HttpOnly cookie,
+без server-side сессий) — sticky sessions не нужны, запрос от одного клиента спокойно
+обслуживается разными репликами.
+
+- конфиг: `nginx/nginx.conf`
+- какая реплика ответила — видно в заголовке ответа `X-Upstream-Addr` и в access-логе
+  nginx (`upstream=...`)
+- обе реплики отдельно видны в Prometheus (`instance="app1:8080"` / `"app2:8080"`),
+  в Loki (`container="bankcards-app1"` / `"bankcards-app2"`) и в Tempo
+  (`service.instance.id="app1"` / `"app2"`, resource-атрибут из `$HOSTNAME`,
+  см. `management.opentelemetry.resource-attributes` в `application.yml`)
+- в Pyroscope обе реплики пишут профили под общим `application="bankcards"`
+  (нормально для горизонтального масштабирования одного сервиса)
+
+Проверить балансировку:
+```bash
+for i in $(seq 1 10); do curl -sI http://localhost:8080/actuator/health | grep -i x-upstream-addr; done
+```
+
+## Observability (Grafana LGTM stack)
+
+Метрики, логи и трейсы собираются единым агентом **Grafana Alloy** и визуализируются
+в **Grafana**:
+
+- приложение отдаёт метрики Prometheus на `/actuator/prometheus` и трейсы по OTLP —
+  Alloy их скрейпит/принимает;
+- Alloy читает stdout всех контейнеров compose-проекта (через Docker socket) и
+  пушит логи в **Loki**;
+- Alloy скрейпит `/actuator/prometheus` и делает `remote_write` в **Prometheus**;
+- Alloy принимает OTLP-трейсы от приложения (`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`)
+  и экспортирует их в **Tempo**;
+- приложение профилируется агентом **Pyroscope Java** (`-javaagent:/app/pyroscope.jar`,
+  подключён в Dockerfile), профили пушатся напрямую в **Pyroscope** сервер;
+- в Grafana датасорсы (Prometheus/Loki/Tempo/Pyroscope) прописаны через provisioning
+  (`observability/grafana/provisioning`) с настроенной корреляцией
+  log → trace → metric → profile (exemplars, derived fields, service graph,
+  traces-to-profiles).
+
+| Сервис | URL |
+|---|---|
+| Grafana | http://localhost:3000 (анонимный доступ, роль Admin) |
+| Prometheus | http://localhost:9090 |
+| Loki | http://localhost:3100 |
+| Tempo | http://localhost:3200 |
+| Pyroscope | http://localhost:4040 |
+| Alloy UI | http://localhost:12345 |
+
+Конфиги стека — в `observability/{prometheus,loki,tempo,alloy,grafana}`.
 
 ## Локальный запуск
 
@@ -62,6 +117,8 @@ docker compose up --build
 | `AUTH_CORS_ALLOWED_ORIGINS` | разрешённые origin (через запятую) | `http://localhost:3000,http://localhost:8080` |
 | `AUTH_CSRF_ENABLED` | включение CSRF-защиты | `true` |
 | `card.expiry.cron` | расписание шедулера просрочки | `0 5 0 * * *` (ежедневно 00:05) |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | адрес приёма OTLP-трейсов (Alloy) | `http://localhost:4318/v1/traces` |
+| `PYROSCOPE_SERVER_ADDRESS` | адрес Pyroscope-сервера для пуша профилей | `http://pyroscope:4040` |
 
 > Для production обязательно задать `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY`, `CARD_ENCRYPTION_KEY`
 > и `AUTH_COOKIE_SECURE=true`.

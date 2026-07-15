@@ -1,0 +1,86 @@
+// ---------------------------------------------------------------------------
+// Logs: discover docker containers on this host and ship their stdout/stderr
+// to Loki, labeled by compose service name.
+// ---------------------------------------------------------------------------
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service_name"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  labels     = {"job" = "docker"}
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Metrics: scrape the app's Actuator/Prometheus endpoint and remote_write
+// into Prometheus.
+// ---------------------------------------------------------------------------
+prometheus.scrape "app" {
+  targets = [
+    {"__address__" = "app1:8080"},
+    {"__address__" = "app2:8080"},
+  ]
+  metrics_path = "/actuator/prometheus"
+  scrape_interval = "15s"
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Traces: receive OTLP from the app and forward to Tempo.
+// ---------------------------------------------------------------------------
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
